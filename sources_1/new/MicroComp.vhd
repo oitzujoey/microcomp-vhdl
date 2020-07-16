@@ -127,7 +127,7 @@ architecture Behavioral of MicroComp is
     
     signal RAMD:    mem_type;
     signal RAMP:    mem_type;
-    signal ROMP:    mem_type := load_mem("Test_1.mem");
+    signal ROMP:    mem_type := load_mem("../imports/Assembly Programs/fibonacci.mem");
 begin
 
 an <= "1111";
@@ -182,7 +182,7 @@ u0: MicroComp_Processor port map(
 --Output
 led(7 downto 0) <= output;
 
-u31: SN74574 port map(
+u31_out: SN74574 port map(
     clk => u28y(1),
     d => datad,
     noe => '0',
@@ -193,7 +193,7 @@ u31: SN74574 port map(
 --Input
 input <= sw(7 downto 0);
 
-u27: SN74245 port map(
+u27_in: SN74245 port map(
     dir => '0',
     noe => u28y(2),
     

@@ -208,7 +208,7 @@ architecture Behavioral of MicroComp_Processor is
         b:        inout std_logic_vector(7 downto 0));
     end component;
     
-    type microcode_type is array(511 downto 0) of std_logic_vector(7 downto 0);
+    type microcode_type is array(1023 downto 0) of std_logic_vector(7 downto 0);
     
     --Initialize microcode
     impure function load_microcode(fileName: in string) return microcode_type is
@@ -228,7 +228,7 @@ architecture Behavioral of MicroComp_Processor is
     signal irld:        std_logic;                      --Instruction Register Load
     signal ir:          std_logic_vector(7 downto 0);   --Instruction Register
     signal irldCalcBuf: std_logic_vector(4 downto 0);   --Instruction Register Load Calculation Buffer
-    signal microAddr:   std_logic_vector(8 downto 0);   --Microcode ROM address bus
+    signal microAddr:   std_logic_vector(9 downto 0);   --Microcode ROM address bus
     signal naoe:        std_logic;                      --A register output enable
     signal nashoe:      std_logic;                      --A register right-shift output enable
     signal fsors:       std_logic;                      --Flag source select
@@ -246,9 +246,9 @@ architecture Behavioral of MicroComp_Processor is
     signal pcck:        std_logic;                      --Program counter clock
     signal cclk:        std_logic;                      --C register clock
     signal nbcoe:       std_logic;                      --BC register pair address output enable
-    signal microcode1:  microcode_type := load_microcode("Microcode_1.mem");    --Microcode ROM 1
-    signal microcode2:  microcode_type := load_microcode("Microcode_2.mem");    --Microcode ROM 2
-    signal microcode3:  microcode_type := load_microcode("Microcode_3.mem");    --Microcode ROM 3
+    signal microcode1:  microcode_type := load_microcode("../imports/v1.1.1/microcode-v1.1.1-1.mem");    --Microcode ROM 1
+    signal microcode2:  microcode_type := load_microcode("../imports/v1.1.1/microcode-v1.1.1-2.mem");    --Microcode ROM 2
+    signal microcode3:  microcode_type := load_microcode("../imports/v1.1.1/microcode-v1.1.1-3.mem");    --Microcode ROM 3
     signal aluZeroBuf:  std_logic_vector(12 downto 0);  --ALU data bus concatenated to "00000"
     signal aluf:        std_logic_vector(7 downto 0);   --ALU output
     signal nzero:       std_logic;                      --Zero flag
@@ -290,6 +290,8 @@ architecture Behavioral of MicroComp_Processor is
     signal u7d:         std_logic_vector(7 downto 0);
     signal u3b:         std_logic_vector(3 downto 0);
     signal u12d:        std_logic_vector(7 downto 0);
+    signal ncoe:        std_logic;
+    signal test:        std_logic;
 begin
 
 --Data address bus
@@ -298,7 +300,7 @@ dataAddr <= c & b;
 --Flag select multiplexer
 u12d <= '1' & fl(6 downto 0);
 
-u12: SN74151 port map(
+u12_f_sel: SN74151 port map(
     d => u12d,
     strobe => '0',
     sel => ir(2 downto 0),
@@ -307,7 +309,7 @@ u12: SN74151 port map(
 );
 
 --Flag register 3-state
-u13: SN74244 port map(
+u13_f_3_state: SN74244 port map(
     a1 => fl(3 downto 0),
     a2 => fl(7 downto 4),
     noc1 => nfoe,
@@ -318,7 +320,7 @@ u13: SN74244 port map(
 );
 
 --Flag register
-u7: SN74574 port map(
+u7_f: SN74574 port map(
     clk => flck,
     d => u7d,
     noe => '0',
@@ -329,9 +331,9 @@ u7: SN74574 port map(
 --Flag register low multiplexer
 u3b <= nzero & ovr & sign & u8cno(1);
 
-u3: SN74257 port map(
+u3_f_mux_l: SN74257 port map(
     noc => '0',
-    a => acc(3 downto 0),
+    a => data(3 downto 0),
     b => u3b,
     sel => fsors,
     
@@ -341,9 +343,9 @@ u3: SN74257 port map(
 --Flag register high multiplexer
 u4b <= '1' & acc(0) & even & u8cno(0);
 
-u4: SN74257 port map(
+u4_f_mux_h: SN74257 port map(
     noc => '0',
-    a => acc(7 downto 4),
+    a => data(7 downto 4),
     b => u4b,
     sel => fsors,
     
@@ -353,7 +355,7 @@ u4: SN74257 port map(
 --A register shift 3-state
 u11a2 <= fl(6) & acc(7 downto 5);
 
-u11: SN74244 port map(
+u11_a_shr: SN74244 port map(
     a1 => acc(4 downto 1),
     a2 => u11a2,
     noc1 => nashoe,
@@ -364,7 +366,7 @@ u11: SN74244 port map(
 );
 
 --A register 3-state
-u10: SN74244 port map(
+u10_a_3_state: SN74244 port map(
     a1 => acc(3 downto 0),
     a2 => acc(7 downto 4),
     noc1 => naoe,
@@ -375,7 +377,7 @@ u10: SN74244 port map(
 );
 
 --B register 3-state
-u15: SN74244 port map(
+u15_b_3_state: SN74244 port map(
     a1 => b(3 downto 0),
     a2 => b(7 downto 4),
     noc1 => nboe,
@@ -386,7 +388,7 @@ u15: SN74244 port map(
 );
 
 --ALU 3-state
-u14: SN74244 port map(
+u14_alu_3_state: SN74244 port map(
     a1 => aluf(3 downto 0),
     a2 => aluf(7 downto 4),
     noc1 => naluoe,
@@ -400,7 +402,7 @@ u14: SN74244 port map(
 u8gi <= "11" & u6ng & u5ng;
 u8pi <= "11" & u6np & u5np;
 
-u8: SN74182 port map(
+u8_carry_gen: SN74182 port map(
     gi => u8gi,
     pi => u8pi,
     cni => fl(0),
@@ -408,8 +410,10 @@ u8: SN74182 port map(
     cno => u8cno
 );
 
+sel <= ir(2 downto 0);
+
 --ALU low
-u5: SN74381 port map(
+u5_alu_l: SN74381 port map(
     a => acc(3 downto 0),
     b => b(3 downto 0),
     s => sel,
@@ -421,7 +425,7 @@ u5: SN74381 port map(
 );
 
 --ALU high
-u6: SN74381 port map(
+u6_alu_h: SN74381 port map(
     a => acc(7 downto 4),
     b => b(7 downto 4),
     s => sel,
@@ -433,7 +437,7 @@ u6: SN74381 port map(
 );
 
 --A register
-u1: SN74574 port map(
+u1_a: SN74574 port map(
     clk => aclk,
     noe => '0',
     d => data,
@@ -442,7 +446,7 @@ u1: SN74574 port map(
 );
 
 --B register
-u2: SN74574 port map(
+u2_b: SN74574 port map(
     clk => bclk,
     noe => '0',
     d => data,
@@ -451,7 +455,7 @@ u2: SN74574 port map(
 );
 
 --Program counter low 3-state
-u37: SN74244 port map(
+u37_pc_l_3_state: SN74244 port map(
     a1 => pc(3 downto 0),
     a2 => pc(7 downto 4),
     noc1 => npcoe,
@@ -462,7 +466,7 @@ u37: SN74244 port map(
 );
 
 --Program counter high 3-state
-u38: SN74244 port map(
+u38_pc_h_3_state: SN74244 port map(
     a1 => pc(11 downto 8),
     a2 => pc(15 downto 12),
     noc1 => npcoe,
@@ -478,7 +482,7 @@ npce2 <= '1';
 npcld <= u30y(0);
 
 --Program counter 3:0
-u33: SN74161 port map(
+u33_pc_3_0: SN74161 port map(
     clk => pcck,
     d => b(3 downto 0),
     et => npce2,
@@ -491,7 +495,7 @@ u33: SN74161 port map(
 );
 
 --Program counter 7:4
-u34: SN74161 port map(
+u34_pc_7_4: SN74161 port map(
     clk => pcck,
     d => b(7 downto 4),
     et => u33rco,
@@ -504,7 +508,7 @@ u34: SN74161 port map(
 );
 
 --Program counter 11:8
-u35: SN74161 port map(
+u35_pc_11_8: SN74161 port map(
     clk => pcck,
     d => c(3 downto 0),
     et => u34rco,
@@ -517,7 +521,7 @@ u35: SN74161 port map(
 );
 
 --Program counter 15:12
-u36: SN74161 port map(
+u36_pc_15_12: SN74161 port map(
     clk => pcck,
     d => c(7 downto 4),
     et => u35rco,
@@ -530,7 +534,7 @@ u36: SN74161 port map(
 );
 
 --B register address 3-state output
-u39: SN74244 port map(
+u39_b_addr_3_state: SN74244 port map(
     a1 => b(3 downto 0),
     a2 => b(7 downto 4),
     noc1 => nbcoe,
@@ -541,7 +545,7 @@ u39: SN74244 port map(
 );
 
 --C register address 3-state output
-u40: SN74244 port map(
+u40_c_addr_3_state: SN74244 port map(
     a1 => c(3 downto 0),
     a2 => c(7 downto 4),
     noc1 => nbcoe,
@@ -552,7 +556,7 @@ u40: SN74244 port map(
 );
 
 --C register
-u41: SN74574 port map(
+u41_c: SN74574 port map(
     clk => cclk,
     d => data,
     noe => '0',
@@ -560,8 +564,19 @@ u41: SN74574 port map(
     q => c
 );
 
+--C register data 3-state output
+u42_c_3_state: SN74244 port map(
+    a1 => c(3 downto 0),
+    a2 => c(7 downto 4),
+    noc1 => ncoe,
+    noc2 => ncoe,
+    
+    y1 => data(3 downto 0),
+    y2 => data(7 downto 4)
+);
+
 --Data bus transciever
-u32: SN74245 port map(
+u32_bus_trans: SN74245 port map(
     dir => ddir,
     noe => ndtoe,
     
@@ -607,14 +622,14 @@ u9: SN7486 port map(
 --"Zero" detect. Is really 0xFF detect.
 aluZeroBuf <= "11111" & aluf;
 
-u19: SN74133 port map(
+u19_zero: SN74133 port map(
     d => aluZeroBuf,
     
     y => nzero
 );
 
 --Even parity flag
-u20: SN74280 port map(
+u20_parity: SN74280 port map(
     d => aluZeroBuf(8 downto 0),
     
     even => odd,
@@ -623,7 +638,7 @@ u20: SN74280 port map(
 
 --Microcode address bus
 microAddr(3 downto 0) <= upc;
-microAddr(8 downto 4) <= ir(7 downto 3);
+microAddr(9 downto 4) <= ir(7 downto 2);
 
 --Microcode chip #1
 nwrp <= microcode1(to_integer(unsigned(microAddr)))(0);
@@ -636,7 +651,7 @@ naluoe <= microcode1(to_integer(unsigned(microAddr)))(6);
 aclk <= microcode1(to_integer(unsigned(microAddr)))(7);
 
 --Microcode chip #2
-sel <= microcode2(to_integer(unsigned(microAddr)))(2 downto 0);
+ncoe <= microcode2(to_integer(unsigned(microAddr)))(2);
 bclk <= microcode2(to_integer(unsigned(microAddr)))(3);
 nboe <= microcode2(to_integer(unsigned(microAddr)))(4);
 nfoe <= microcode2(to_integer(unsigned(microAddr)))(5);
@@ -652,6 +667,8 @@ nbcoe <= microcode3(to_integer(unsigned(microAddr)))(4);
 nwrd <= microcode3(to_integer(unsigned(microAddr)))(5);
 nrdd <= microcode3(to_integer(unsigned(microAddr)))(6);
 nupcrst <= microcode3(to_integer(unsigned(microAddr)))(7);
+
+
 
 --Concatenate '0' to the microprogram counter.
 irldCalcBuf <= (upc & '0');
@@ -670,7 +687,7 @@ irld <= or_reduce(upc);
 --ir <= "00000000";
 
 --Instruction register (Previously 74373 - 7/19/2018)
-u43: SN74574 port map(
+u43_ir: SN74574 port map(
     clk  => irld,
     d   => progData,
     noe => '0',
@@ -679,7 +696,7 @@ u43: SN74574 port map(
 );
 
 --Microprogram counter
-u16: SN74163 port map(
+u16_upc: SN74163 port map(
     clk     => clk,
     d       => "0000",
     et      => '1',
